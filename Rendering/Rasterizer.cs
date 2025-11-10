@@ -118,7 +118,10 @@ public class Rasterizer
             // All vertices behind near plane - discard
             return;
         }
-        else if (clipCount == 0)
+
+        // No frustum culling here - we'll clip in screen space instead
+        // This handles partial visibility correctly
+        if (clipCount == 0)
         {
             // No clipping needed - render normally
             RasterizeTriangle(tri.V0, tri.V1, tri.V2, v0, v1, v2, tri.Texture, triangleIndex);
@@ -233,6 +236,18 @@ public class Rasterizer
         Float2 p0 = ProjectToScreen(v0.Position);
         Float2 p1 = ProjectToScreen(v1.Position);
         Float2 p2 = ProjectToScreen(v2.Position);
+
+        // Screen-space frustum culling - early rejection if completely off-screen
+        float minScreenX = MathF.Min(MathF.Min(p0.X, p1.X), p2.X);
+        float maxScreenX = MathF.Max(MathF.Max(p0.X, p1.X), p2.X);
+        float minScreenY = MathF.Min(MathF.Min(p0.Y, p1.Y), p2.Y);
+        float maxScreenY = MathF.Max(MathF.Max(p0.Y, p1.Y), p2.Y);
+
+        // Reject if completely outside screen bounds
+        if (maxScreenX < 0 || minScreenX >= width || maxScreenY < 0 || minScreenY >= height)
+        {
+            return; // Triangle completely off-screen
+        }
 
         // Calculate screen-space triangle area (in pixels)
         float screenArea = MathF.Abs(
