@@ -35,3 +35,5 @@ packages/
 # IDE
 .idea/
 *.iml
+.history/
+.claude/settings.local.json

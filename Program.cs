@@ -54,9 +54,9 @@ class Program
         List<Float3> torchPositions = new List<Float3>
         {
             new Float3(7, 2.5f, 7),    // Center torch (main light)
-            new Float3(2, 2.5f, 2),    // Corner torch
-            new Float3(12, 2.5f, 2),   // Corner torch
-            new Float3(2, 2.5f, 12)    // Corner torch
+            //new Float3(2, 2.5f, 2),    // Corner torch
+            //new Float3(12, 2.5f, 2),   // Corner torch
+            //new Float3(2, 2.5f, 12)    // Corner torch
         };
 
         // Create multiple point lights for each torch
@@ -117,7 +117,7 @@ class Program
                 if (recordingMessageTime > 0f)
                     recordingMessageTime -= deltaTime;
 
-                // Handle GIF recording (Ctrl+8)
+                // Handle GIF recording start (Ctrl+8)
                 if (Raylib.IsKeyDown(KeyboardKey.LeftControl) && Raylib.IsKeyPressed(KeyboardKey.Eight))
                 {
                     if (!gifEncoder.IsRecording)
@@ -127,17 +127,31 @@ class Program
                         recordingMessageTime = 2.0f;
                         Console.WriteLine("Started GIF recording");
                     }
-                    else
+                }
+
+                // Handle GIF recording stop (Ctrl+9)
+                if (Raylib.IsKeyDown(KeyboardKey.LeftControl) && Raylib.IsKeyPressed(KeyboardKey.Nine))
+                {
+                    if (gifEncoder.IsRecording)
                     {
                         gifEncoder.StopRecording();
                         recordingMessage = "GIF Recording Stopped";
                         recordingMessageTime = 2.0f;
                         Console.WriteLine($"Stopped GIF recording ({gifEncoder.FrameCount} frames)");
 
-                        // Save to desktop
-                        string desktopPath = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
-                        string timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
-                        string gifPath = Path.Combine(desktopPath, $"render_{timestamp}.gif");
+                        // Determine save path based on config
+                        string gifPath;
+                        if (lightingConfig.UseCustomGifPath && !string.IsNullOrWhiteSpace(lightingConfig.CustomGifPath))
+                        {
+                            gifPath = lightingConfig.CustomGifPath;
+                        }
+                        else
+                        {
+                            // Default to desktop with timestamp
+                            string desktopPath = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
+                            string timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
+                            gifPath = Path.Combine(desktopPath, $"render_{timestamp}.gif");
+                        }
 
                         Console.WriteLine($"Saving GIF to {gifPath}...");
                         gifEncoder.SaveToFile(gifPath);

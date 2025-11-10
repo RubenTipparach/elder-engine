@@ -73,3 +73,12 @@ torch:
   # Torch position in world space (x, y, z)
   # This is the position where the BOTTOM of the torch sits (on top of cube surface)
   position: [7, 2.5, 7]
+
+# GIF Recording
+gif_recording:
+  # Use custom file path for saving GIFs
+  use_custom_path: true
+
+  # Custom path for saving GIFs (only used if use_custom_path is true)
+  # Example: C:\Users\YourName\Videos\recording.gif
+  custom_path: 'C:\Users\santi\Desktop\picotron_desktop'

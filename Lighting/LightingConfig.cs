@@ -27,6 +27,10 @@ public class LightingConfig
     public float BrightnessFlickerAmplitude { get; set; } = 0.15f;
     public float BrightnessFlickerNoiseIntensity { get; set; } = 0.3f;
 
+    // GIF Recording
+    public bool UseCustomGifPath { get; set; } = false;
+    public string CustomGifPath { get; set; } = "";
+
     public static LightingConfig LoadFromFile(string filepath)
     {
         var config = new LightingConfig();
@@ -100,6 +104,15 @@ public class LightingConfig
             {
                 if (torch.TryGetValue("position", out var position))
                     config.TorchPosition = ParseFloat3Array(position);
+            }
+
+            // Parse gif_recording section
+            if (yamlData.TryGetValue("gif_recording", out var gifRecording))
+            {
+                if (gifRecording.TryGetValue("use_custom_path", out var useCustomPath))
+                    config.UseCustomGifPath = bool.Parse(useCustomPath);
+                if (gifRecording.TryGetValue("custom_path", out var customPath))
+                    config.CustomGifPath = customPath;
             }
 
             Console.WriteLine($"Loaded lighting config from {filepath}");
@@ -182,6 +195,9 @@ public class LightingConfig
         Console.WriteLine($"Ambient: {Ambient}");
         Console.WriteLine($"Diffuse: {Diffuse}");
         Console.WriteLine($"Adaptive Lighting: {AdaptiveLightingEnabled}");
+        Console.WriteLine($"Use Custom GIF Path: {UseCustomGifPath}");
+        if (UseCustomGifPath)
+            Console.WriteLine($"Custom GIF Path: {CustomGifPath}");
         Console.WriteLine("==============================");
     }
 }

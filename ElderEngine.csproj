@@ -22,4 +22,14 @@
     </None>
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- Exclude cloned repositories from compilation -->
+    <Compile Remove="raylib-cs\**" />
+    <Compile Remove="Software-Rasterizer\**" />
+    <EmbeddedResource Remove="raylib-cs\**" />
+    <EmbeddedResource Remove="Software-Rasterizer\**" />
+    <None Remove="raylib-cs\**" />
+    <None Remove="Software-Rasterizer\**" />
+  </ItemGroup>
+
 </Project>
