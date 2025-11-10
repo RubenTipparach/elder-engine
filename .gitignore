@@ -1,0 +1,37 @@
+# Build results
+bin/
+obj/
+*.dll
+*.exe
+*.pdb
+
+# Visual Studio cache
+.vs/
+.vscode/
+*.user
+*.suo
+*.sln.docstates
+
+# User-specific files
+.DS_Store
+*.swp
+*.swo
+*~
+
+# Test results
+TestResults/
+*.trx
+
+# NuGet
+packages/
+*.nupkg
+*.snupkg
+
+# Output files
+*.gif
+*.png
+*.jpg
+
+# IDE
+.idea/
+*.iml

@@ -1,0 +1,75 @@
+# Lighting Configuration
+# Modify these values and reload to adjust lighting appearance
+
+# Light properties
+light:
+  # Position relative to torch base (x, y, z)
+  position_offset: [0, 2.0, 0]
+
+  # Light color (r, g, b) - values from 0.0 to 1.0
+  color: [1.0, 0.85, 0.6]
+
+  # Light range in world units
+  range: 10.0
+
+  # Number of discrete brightness bands (lower = more pronounced banding)
+  bands: 6
+
+  # Dithering threshold (0.0 = no dither, 1.0 = full range dithering)
+  # Controls how much of the gradient between bands gets dithered
+  # Recommended: 0.3-0.5 for subtle dithering, 0.8-1.0 for smooth transitions
+  dither_range: 0.3
+
+# Flickering effect
+flickering:
+  # Enable/disable all flickering
+  enabled: true
+
+  # Range flickering - affects how far the light reaches
+  # Frequency in Hz (cycles per second)
+  # Recommended: 0.5-2 for subtle torch effect
+  range_frequency: 0.01
+
+  # Amplitude (0.0 to 1.0) - how much the light range varies
+  # Recommended: 0.05-0.15 for subtle effect
+  range_amplitude: 0.1
+
+  # Noise intensity (0.0 to 1.0) - adds randomness to the sine wave
+  # Recommended: 0.3-0.5 for natural torch effect
+  range_noise: 0.4
+
+  # Brightness flickering - affects the light intensity/brightness
+  # Frequency in Hz (cycles per second)
+  # Recommended: 4-12 for torch-like flicker
+  brightness_frequency: 0.01
+
+  # Amplitude (0.0 to 1.0) - how much the brightness varies
+  # Recommended: 0.1-0.2 for subtle, 0.3-0.4 for dramatic
+  brightness_amplitude: 0.15
+
+  # Noise intensity (0.0 to 1.0) - adds randomness
+  # Recommended: 0.2-0.4 for natural torch effect
+  brightness_noise: 0.2
+
+
+# Global lighting
+lighting:
+  # Ambient light level (0.0 = full dark, 1.0 = full bright)
+  ambient: 0.15
+
+  # Diffuse contribution (0.0 = no light effect, 1.0 = full light effect)
+  diffuse: 1
+
+# Performance settings
+performance:
+  # Adaptive lighting - reduces lighting calculations for large triangles
+  # When enabled, lighting is calculated at lower resolution for triangles
+  # that cover a large portion of the screen, then reused for nearby pixels
+  # true = better performance when close to geometry, false = always per-pixel lighting
+  adaptive_lighting: true
+
+# Torch model
+torch:
+  # Torch position in world space (x, y, z)
+  # This is the position where the BOTTOM of the torch sits (on top of cube surface)
+  position: [7, 2.5, 7]
