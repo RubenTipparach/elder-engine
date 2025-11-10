@@ -9,13 +9,20 @@ class Program
     {
         const int windowWidth = 1280;
         const int windowHeight = 720;
-        const int renderWidth = 480;
-        const int renderHeight = 270;
+
+        // Load engine configuration
+        string configPath = Path.Combine(AppContext.BaseDirectory, "config.yaml");
+        var config = EngineConfig.LoadFromFile(configPath);
+        config.PrintConfig();
+
+        // Get render resolution from config
+        int renderWidth = config.RenderWidth;
+        int renderHeight = config.RenderHeight;
 
         Raylib.InitWindow(windowWidth, windowHeight, "Software Rasterizer - Cube with Grass & Dirt");
         Raylib.SetTargetFPS(60);
 
-        // Create rasterizer at lower resolution
+        // Create rasterizer at configured resolution
         var rasterizer = new Rasterizer(renderWidth, renderHeight);
 
         // Create GIF recorder for recording at 30 fps
@@ -24,15 +31,10 @@ class Program
         float recordingMessageTime = 0f;
         int frameCounter = 0; // For skipping frames
 
-        // Load lighting configuration
-        string configPath = Path.Combine(AppContext.BaseDirectory, "lighting.yaml");
-        var lightingConfig = LightingConfig.LoadFromFile(configPath);
-        lightingConfig.PrintConfig();
-
         // Apply lighting config to rasterizer
-        rasterizer.Ambient = lightingConfig.Ambient;
-        rasterizer.Diffuse = lightingConfig.Diffuse;
-        rasterizer.AdaptiveLightingEnabled = lightingConfig.AdaptiveLightingEnabled;
+        rasterizer.Ambient = config.Ambient;
+        rasterizer.Diffuse = config.Diffuse;
+        rasterizer.AdaptiveLightingEnabled = config.AdaptiveLightingEnabled;
 
         // Get the directory where the executable is located
         string exeDir = AppContext.BaseDirectory;
@@ -53,30 +55,30 @@ class Program
         // Create multiple torch positions
         List<Float3> torchPositions = new List<Float3>
         {
-            new Float3(7, 2.5f, 7),    // Center torch (main light)
-            //new Float3(2, 2.5f, 2),    // Corner torch
-            //new Float3(12, 2.5f, 2),   // Corner torch
-            //new Float3(2, 2.5f, 12)    // Corner torch
+            new Float3(8, 2.5f, 8),    // Center torch (main light)
+            new Float3(20, 3f, 20),    // Corner torch
+            new Float3(12, 2.5f, 12),   // Corner torch
+            new Float3(10, 2.5f, 12)    // Corner torch
         };
 
         // Create multiple point lights for each torch
         List<PointLight> pointLights = new List<PointLight>();
         foreach (var torchPos in torchPositions)
         {
-            Float3 lightPosition = torchPos + lightingConfig.PositionOffset;
+            Float3 lightPosition = torchPos + config.PositionOffset;
             var light = new PointLight(
                 lightPosition,
-                lightingConfig.LightColor,
-                lightingConfig.Range,
-                lightingConfig.Bands,
-                lightingConfig.DitherRange,
-                lightingConfig.FlickeringEnabled,
-                lightingConfig.RangeFlickerFrequency,
-                lightingConfig.RangeFlickerAmplitude,
-                lightingConfig.RangeFlickerNoiseIntensity,
-                lightingConfig.BrightnessFlickerFrequency,
-                lightingConfig.BrightnessFlickerAmplitude,
-                lightingConfig.BrightnessFlickerNoiseIntensity
+                config.LightColor,
+                config.Range,
+                config.Bands,
+                config.DitherRange,
+                config.FlickeringEnabled,
+                config.RangeFlickerFrequency,
+                config.RangeFlickerAmplitude,
+                config.RangeFlickerNoiseIntensity,
+                config.BrightnessFlickerFrequency,
+                config.BrightnessFlickerAmplitude,
+                config.BrightnessFlickerNoiseIntensity
             );
             pointLights.Add(light);
         }
@@ -141,9 +143,9 @@ class Program
 
                         // Determine save path based on config
                         string gifPath;
-                        if (lightingConfig.UseCustomGifPath && !string.IsNullOrWhiteSpace(lightingConfig.CustomGifPath))
+                        if (config.UseCustomGifPath && !string.IsNullOrWhiteSpace(config.CustomGifPath))
                         {
-                            gifPath = lightingConfig.CustomGifPath;
+                            gifPath = config.CustomGifPath;
                         }
                         else
                         {
@@ -214,12 +216,12 @@ class Program
                 var sceneTriangles = new List<Triangle>(terrainTriangles);
 
                 // Update main torch position to follow light (subtract offset to get torch base)
-                torchPositions[0] = mainLight.Position - lightingConfig.PositionOffset;
+                torchPositions[0] = mainLight.Position - config.PositionOffset;
 
                 // Update all light positions to match torches
                 for (int i = 0; i < torchPositions.Count; i++)
                 {
-                    pointLights[i].Position = torchPositions[i] + lightingConfig.PositionOffset;
+                    pointLights[i].Position = torchPositions[i] + config.PositionOffset;
                     var torchTriangles = TorchMesh.CreateTorch(torchPositions[i], woodTexture, fireTexture);
                     sceneTriangles.AddRange(torchTriangles);
                 }
@@ -272,10 +274,9 @@ class Program
                 Raylib.DrawTexturePro(displayTexture, srcRect, dstRect, new System.Numerics.Vector2(0, 0), 0f, Color.White);
 
                 Raylib.DrawFPS(10, 10);
-                // Raylib.DrawText("WASD: Move | Arrows: Rotate | Space/Shift: Up/Down | Ctrl+8: Record GIF", 10, 30, 20, Color.White);
-                // Raylib.DrawText("IJKL: Move Main Light (Forward/Back/Left/Right) | UO: Light Up/Down", 10, 50, 20, Color.White);
-                Raylib.DrawText($"Camera: ({cameraPos.X:F1}, {cameraPos.Y:F1}, {cameraPos.Z:F1})", 10, 70, 20, Color.White);
-                Raylib.DrawText($"Main Light: ({mainLight.Position.X:F1}, {mainLight.Position.Y:F1}, {mainLight.Position.Z:F1}) | Lights: {pointLights.Count}", 10, 90, 20, Color.White);
+                Raylib.DrawText($"Triangles: {rasterizer.RenderedTriangleCount}/{sceneTriangles.Count}", 10, 30, 20, Color.White);
+                Raylib.DrawText($"Camera: ({cameraPos.X:F1}, {cameraPos.Y:F1}, {cameraPos.Z:F1})", 10, 50, 20, Color.White);
+                Raylib.DrawText($"Main Light: ({mainLight.Position.X:F1}, {mainLight.Position.Y:F1}, {mainLight.Position.Z:F1}) | Lights: {pointLights.Count}", 10, 70, 20, Color.White);
 
                 // Show recording message if active
                 if (recordingMessageTime > 0f)

@@ -1,7 +1,12 @@
 namespace RasterizerCube;
 
-public class LightingConfig
+public class EngineConfig
 {
+    // Rendering
+    public int RenderWidth { get; set; } = 320;
+    public int RenderHeight { get; set; } = 180;
+
+    // Lighting
     public Float3 PositionOffset { get; set; } = new Float3(0, 2.5f, 0);
     public Float3 LightColor { get; set; } = new Float3(1.0f, 0.85f, 0.6f);
     public float Range { get; set; } = 18f;
@@ -31,9 +36,9 @@ public class LightingConfig
     public bool UseCustomGifPath { get; set; } = false;
     public string CustomGifPath { get; set; } = "";
 
-    public static LightingConfig LoadFromFile(string filepath)
+    public static EngineConfig LoadFromFile(string filepath)
     {
-        var config = new LightingConfig();
+        var config = new EngineConfig();
 
         if (!File.Exists(filepath))
         {
@@ -45,7 +50,25 @@ public class LightingConfig
         {
             var yamlData = ParseYaml(File.ReadAllText(filepath));
 
-            // Parse light section
+            // Parse rendering section
+            if (yamlData.TryGetValue("rendering", out var rendering))
+            {
+                if (rendering.TryGetValue("width", out var width))
+                    config.RenderWidth = int.Parse(width);
+                if (rendering.TryGetValue("height", out var height))
+                    config.RenderHeight = int.Parse(height);
+            }
+
+            // Parse gif_recording section
+            if (yamlData.TryGetValue("gif_recording", out var gifRecording))
+            {
+                if (gifRecording.TryGetValue("use_custom_path", out var useCustomPath))
+                    config.UseCustomGifPath = bool.Parse(useCustomPath);
+                if (gifRecording.TryGetValue("custom_path", out var customPath))
+                    config.CustomGifPath = customPath;
+            }
+
+            // Parse light section (root level)
             if (yamlData.TryGetValue("light", out var light))
             {
                 if (light.TryGetValue("position_offset", out var posOffset))
@@ -60,7 +83,7 @@ public class LightingConfig
                     config.DitherRange = float.Parse(ditherRange);
             }
 
-            // Parse flickering section
+            // Parse flickering section (root level)
             if (yamlData.TryGetValue("flickering", out var flickering))
             {
                 if (flickering.TryGetValue("enabled", out var enabled))
@@ -83,12 +106,12 @@ public class LightingConfig
                     config.BrightnessFlickerNoiseIntensity = float.Parse(brightnessNoise);
             }
 
-            // Parse lighting section
-            if (yamlData.TryGetValue("lighting", out var lighting))
+            // Parse lighting section (root level - ambient/diffuse)
+            if (yamlData.TryGetValue("lighting", out var rootLighting))
             {
-                if (lighting.TryGetValue("ambient", out var ambient))
+                if (rootLighting.TryGetValue("ambient", out var ambient))
                     config.Ambient = float.Parse(ambient);
-                if (lighting.TryGetValue("diffuse", out var diffuse))
+                if (rootLighting.TryGetValue("diffuse", out var diffuse))
                     config.Diffuse = float.Parse(diffuse);
             }
 
@@ -106,16 +129,7 @@ public class LightingConfig
                     config.TorchPosition = ParseFloat3Array(position);
             }
 
-            // Parse gif_recording section
-            if (yamlData.TryGetValue("gif_recording", out var gifRecording))
-            {
-                if (gifRecording.TryGetValue("use_custom_path", out var useCustomPath))
-                    config.UseCustomGifPath = bool.Parse(useCustomPath);
-                if (gifRecording.TryGetValue("custom_path", out var customPath))
-                    config.CustomGifPath = customPath;
-            }
-
-            Console.WriteLine($"Loaded lighting config from {filepath}");
+            Console.WriteLine($"Loaded engine config from {filepath}");
         }
         catch (Exception ex)
         {
@@ -130,6 +144,8 @@ public class LightingConfig
         var result = new Dictionary<string, Dictionary<string, string>>();
         Dictionary<string, string> currentSection = null;
         string currentSectionName = "";
+        string parentSectionName = "";
+        int lastIndentLevel = 0;
 
         foreach (string line in content.Split('\n'))
         {
@@ -139,17 +155,32 @@ public class LightingConfig
             if (trimmed.StartsWith("#") || string.IsNullOrWhiteSpace(trimmed))
                 continue;
 
+            int indentLevel = line.TakeWhile(c => c == ' ').Count();
+
             // Check if this is a top-level key (no indentation, ends with :)
-            if (!line.StartsWith(" ") && trimmed.EndsWith(":"))
+            if (indentLevel == 0 && trimmed.EndsWith(":"))
             {
                 currentSectionName = trimmed.TrimEnd(':');
+                parentSectionName = currentSectionName;
                 currentSection = new Dictionary<string, string>();
                 result[currentSectionName] = currentSection;
+                lastIndentLevel = 0;
                 continue;
             }
 
-            // Parse indented key-value pairs
-            if (currentSection != null && line.StartsWith("  ") && trimmed.Contains(":"))
+            // Check for nested section (2 spaces indent, ends with :)
+            if (indentLevel == 2 && trimmed.EndsWith(":"))
+            {
+                string nestedKey = trimmed.TrimEnd(':');
+                currentSectionName = $"{parentSectionName}.{nestedKey}";
+                currentSection = new Dictionary<string, string>();
+                result[currentSectionName] = currentSection;
+                lastIndentLevel = 2;
+                continue;
+            }
+
+            // Parse key-value pairs at 2 or 4 space indent
+            if (currentSection != null && (indentLevel == 2 || indentLevel == 4) && trimmed.Contains(":") && !trimmed.EndsWith(":"))
             {
                 int colonIndex = trimmed.IndexOf(':');
                 if (colonIndex > 0)
@@ -182,7 +213,8 @@ public class LightingConfig
 
     public void PrintConfig()
     {
-        Console.WriteLine("=== Lighting Configuration ===");
+        Console.WriteLine("=== Engine Configuration ===");
+        Console.WriteLine($"Render Resolution: {RenderWidth}×{RenderHeight}");
         Console.WriteLine($"Torch Position: {TorchPosition.X}, {TorchPosition.Y}, {TorchPosition.Z}");
         Console.WriteLine($"Light Offset: {PositionOffset.X}, {PositionOffset.Y}, {PositionOffset.Z}");
         Console.WriteLine($"Light Color: {LightColor.X}, {LightColor.Y}, {LightColor.Z}");

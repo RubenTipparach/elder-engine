@@ -2,6 +2,14 @@ namespace RasterizerCube;
 
 public class PointLight
 {
+    // Static Bayer matrix to avoid allocating on every pixel
+    private static readonly int[,] BayerMatrix = new int[4, 4] {
+        { 0, 8, 2, 10 },
+        { 12, 4, 14, 6 },
+        { 3, 11, 1, 9 },
+        { 15, 7, 13, 5 }
+    };
+
     public Float3 Position { get; set; }
     public Float3 Color { get; set; }
     public float Range { get; set; }
@@ -108,6 +116,7 @@ public class PointLight
         return Math.Clamp(1.0f + flicker, 0.1f, 1.5f);
     }
 
+    [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
     public float GetBrightnessFlickerMultiplier()
     {
         if (!FlickeringEnabled)
@@ -179,20 +188,40 @@ public class PointLight
         if (rawIntensity <= 0f)
             return 0f;
 
+        return GetDitheredIntensityFromRaw(rawIntensity, pixelX, pixelY);
+    }
+
+    // Optimized version that accepts pre-calculated distance squared
+    [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
+    public float GetDitheredIntensityFromDistSq(float distSq, int pixelX, int pixelY)
+    {
+        // Early rejection already done by caller
+        float distance = MathF.Sqrt(distSq);
+        float rawIntensity = 1f - (distance / Range);
+        rawIntensity = Math.Clamp(rawIntensity, 0f, 1f);
+
+        // Apply brightness flickering
+        rawIntensity *= GetBrightnessFlickerMultiplier();
+        rawIntensity = Math.Clamp(rawIntensity, 0f, 1f);
+
+        if (rawIntensity <= 0f)
+            return 0f;
+
+        return GetDitheredIntensityFromRaw(rawIntensity, pixelX, pixelY);
+    }
+
+    // Shared dithering logic
+    [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
+    private float GetDitheredIntensityFromRaw(float rawIntensity, int pixelX, int pixelY)
+    {
+
         // Calculate which band we're in and the fractional position
         float bandValue = rawIntensity * Bands;
         int currentBand = (int)MathF.Floor(bandValue);
         float fractionalPart = bandValue - currentBand;
 
-        // Bayer matrix for dithering pattern
-        int[,] bayerMatrix = new int[4, 4] {
-            { 0, 8, 2, 10 },
-            { 12, 4, 14, 6 },
-            { 3, 11, 1, 9 },
-            { 15, 7, 13, 5 }
-        };
-
-        int bayerValue = bayerMatrix[pixelY % 4, pixelX % 4];
+        // Use static Bayer matrix (no allocation)
+        int bayerValue = BayerMatrix[pixelY % 4, pixelX % 4];
         float bayerThreshold = bayerValue / 16.0f;
 
         // DitherRange controls the size of the transition zone at the START of each band

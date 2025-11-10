@@ -1,7 +1,23 @@
-# Lighting Configuration
-# Modify these values and reload to adjust lighting appearance
+# Engine Configuration
 
-# Light properties
+# Rendering settings
+rendering:
+  # Render resolution (internal rasterizer dimensions)
+  width: 320
+  height: 180
+  # width: 480
+  # height: 270
+
+# GIF Recording
+gif_recording:
+  # Use custom file path for saving GIFs
+  use_custom_path: true
+
+  # Custom path for saving GIFs (only used if use_custom_path is true)
+  # Example: C:\Users\YourName\Videos\recording.gif
+  custom_path: 'C:\Users\santi\Desktop\picotron_desktop'
+
+# Lighting Configuration
 light:
   # Position relative to torch base (x, y, z)
   position_offset: [0, 2.0, 0]
@@ -73,12 +89,3 @@ torch:
   # Torch position in world space (x, y, z)
   # This is the position where the BOTTOM of the torch sits (on top of cube surface)
   position: [7, 2.5, 7]
-
-# GIF Recording
-gif_recording:
-  # Use custom file path for saving GIFs
-  use_custom_path: true
-
-  # Custom path for saving GIFs (only used if use_custom_path is true)
-  # Example: C:\Users\YourName\Videos\recording.gif
-  custom_path: 'C:\Users\santi\Desktop\picotron_desktop'

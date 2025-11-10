@@ -37,3 +37,4 @@ packages/
 *.iml
 .history/
 .claude/settings.local.json
+nul

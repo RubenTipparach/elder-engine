@@ -15,6 +15,8 @@ public class Rasterizer
     public float Ambient { get; set; } = 0.15f;
     public float Diffuse { get; set; } = 0.85f;
     public bool AdaptiveLightingEnabled { get; set; } = true;
+    private int renderedTriangleCount = 0; // Count of triangles that made it through culling
+    public int RenderedTriangleCount => renderedTriangleCount;
 
     public Rasterizer(int width, int height)
     {
@@ -35,6 +37,7 @@ public class Rasterizer
     {
         Array.Fill(colorBuffer, new Float3(0.1f, 0.1f, 0.15f));
         Array.Fill(depthBuffer, float.MaxValue);
+        renderedTriangleCount = 0; // Reset triangle counter
     }
 
     public Float3[] GetColorBuffer() => colorBuffer;
@@ -207,20 +210,24 @@ public class Rasterizer
 
     private void RasterizeTriangle(Vertex worldV0, Vertex worldV1, Vertex worldV2, Vertex v0, Vertex v1, Vertex v2, Texture texture, int triangleIndex)
     {
-        // Backface culling
-        // Calculate view direction to triangle center
-        Float3 triCenter = (v0.Position + v1.Position + v2.Position) / 3.0f;
-        Float3 viewDir = triCenter.Normalized(); // Direction from camera (origin in view space) to triangle
-
+        // Backface culling in view space
         // Calculate face normal from edges
         Float3 edge1 = v1.Position - v0.Position;
         Float3 edge2 = v2.Position - v0.Position;
         Float3 faceNormal = Float3.Cross(edge1, edge2).Normalized();
 
-        // If face normal points away from camera (same direction as view), cull it
-        // Dot product > 0 means normal and view direction point in similar directions (backface)
-        if (Float3.Dot(faceNormal, viewDir) > 0)
+        // In view space, camera is at origin looking down -Z
+        // View direction from triangle center to camera is -triCenter
+        Float3 triCenter = (v0.Position + v1.Position + v2.Position) / 3.0f;
+        Float3 viewDir = (new Float3(0, 0, 0) - triCenter).Normalized(); // From triangle to camera
+
+        // If face normal points away from camera, cull it
+        // Dot product < 0 means normal points opposite to view direction (backface)
+        if (Float3.Dot(faceNormal, viewDir) < 0)
             return;
+
+        // Triangle passed culling, increment counter
+        System.Threading.Interlocked.Increment(ref renderedTriangleCount);
 
         // Project to screen space
         Float2 p0 = ProjectToScreen(v0.Position);
@@ -265,7 +272,7 @@ public class Rasterizer
         float invZ1 = 1.0f / v1.Position.Z;
         float invZ2 = 1.0f / v2.Position.Z;
 
-        // Pre-multiply texture coordinates and normals by inverse depth
+        // Pre-multiply texture coordinates by inverse depth
         Float2 texU = v0.TexCoord * invZ0;
         Float2 texV = v1.TexCoord * invZ1;
         Float2 texW = v2.TexCoord * invZ2;
@@ -274,6 +281,11 @@ public class Rasterizer
         Float3 worldU = worldV0.Position * invZ0;
         Float3 worldV = worldV1.Position * invZ1;
         Float3 worldW = worldV2.Position * invZ2;
+
+        // Pre-multiply normals by inverse depth for perspective-correct interpolation
+        Float3 normalU = worldV0.Normal * invZ0;
+        Float3 normalV = worldV1.Normal * invZ1;
+        Float3 normalW = worldV2.Normal * invZ2;
 
         // Cache for lighting calculations (only used when lightingSampleSize > 1)
         Dictionary<(int, int), Float3> lightingCache = lightingSampleSize > 1
@@ -307,6 +319,9 @@ public class Rasterizer
                             // Perspective-correct world position
                             Float3 worldPos = (worldU * w0 + worldV * w1 + worldW * w2) * depth;
 
+                            // Perspective-correct normal
+                            Float3 normal = ((normalU * w0 + normalV * w1 + normalW * w2) * depth).Normalized();
+
                             // Sample texture
                             Float3 color = texture.Sample(texCoord);
 
@@ -331,21 +346,22 @@ public class Rasterizer
                                         {
                                             float gridDepth = 1.0f / (invZ0 * gw0 + invZ1 * gw1 + invZ2 * gw2);
                                             Float3 gridWorldPos = (worldU * gw0 + worldV * gw1 + worldW * gw2) * gridDepth;
+                                            Float3 gridNormal = ((normalU * gw0 + normalV * gw1 + normalW * gw2) * gridDepth).Normalized();
 
-                                            finalLight = CalculateLighting(gridWorldPos, gridX, gridY, triangleIndex);
+                                            finalLight = CalculateLighting(gridWorldPos, gridNormal, gridX, gridY, triangleIndex);
                                             lightingCache[cacheKey] = finalLight;
                                         }
                                         else
                                         {
                                             // Grid center not in triangle, calculate for current pixel
-                                            finalLight = CalculateLighting(worldPos, x, y, triangleIndex);
+                                            finalLight = CalculateLighting(worldPos, normal, x, y, triangleIndex);
                                         }
                                     }
                                 }
                                 else
                                 {
                                     // Per-pixel lighting (default for small triangles)
-                                    finalLight = CalculateLighting(worldPos, x, y, triangleIndex);
+                                    finalLight = CalculateLighting(worldPos, normal, x, y, triangleIndex);
                                 }
 
                                 color = new Float3(
@@ -364,7 +380,7 @@ public class Rasterizer
     }
 
     [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
-    private Float3 CalculateLighting(Float3 worldPos, int x, int y, int triangleIndex)
+    private Float3 CalculateLighting(Float3 worldPos, Float3 normal, int x, int y, int triangleIndex)
     {
         // Get pre-computed lights for this triangle (computed once per frame, not per pixel!)
         List<PointLight> affectingLights = (triangleIndex >= 0 && triangleIndex < lightsPerTriangle.Length)
@@ -376,14 +392,26 @@ public class Rasterizer
 
         foreach (var light in affectingLights)
         {
-            // Get dithered intensity (properly dithers between quantized bands)
-            // Brightness flickering is already applied in GetDitheredIntensity via GetRawIntensity
-            float intensity = light.GetDitheredIntensity(worldPos, x, y);
+            // Early distance rejection - avoid expensive calculations if out of range
+            Float3 toLight = light.Position - worldPos;
+            float distSq = toLight.X * toLight.X + toLight.Y * toLight.Y + toLight.Z * toLight.Z;
+            float rangeSq = light.Range * light.Range;
+
+            if (distSq > rangeSq)
+                continue; // Light doesn't reach this pixel
+
+            // Get dithered intensity using pre-calculated distance (avoids redundant sqrt)
+            // Brightness flickering is already applied inside
+            float intensity = light.GetDitheredIntensityFromDistSq(distSq, x, y);
 
             if (intensity > 0)
             {
+                // Calculate diffuse lighting with normal
+                Float3 lightDir = toLight.Normalized();
+                float diffuseFactor = Math.Max(0f, normal.X * lightDir.X + normal.Y * lightDir.Y + normal.Z * lightDir.Z);
+
                 // Diffuse lighting contribution from this light
-                Float3 lightContribution = light.Color * (intensity * Diffuse);
+                Float3 lightContribution = light.Color * (intensity * diffuseFactor * Diffuse);
                 totalLightContribution = totalLightContribution + lightContribution;
             }
         }
